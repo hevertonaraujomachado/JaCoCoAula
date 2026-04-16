@@ -4,7 +4,6 @@ import com.devsuperior.dscommerce.dto.ProductDTO;
 import com.devsuperior.dscommerce.entities.Category;
 import com.devsuperior.dscommerce.entities.Product;
 import com.devsuperior.dscommerce.tests.TokenUtil;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,12 +14,17 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+
+
 
 
 @SpringBootTest
@@ -44,8 +48,10 @@ public class ProductControllerIT {
 
  private Product product;
  private ProductDTO productDTO;
-    @BeforeEach
-  void setUp() throws Exception {
+ private Long existingProductId, nonexistingProductId, dependentProductId;
+
+ @BeforeEach
+ void setUp() throws Exception {
 
         clientUsername = "maria@gmail.com";
         clientPassword = "123456";
@@ -53,6 +59,10 @@ public class ProductControllerIT {
         adminPassword = "123456";
 
         productName = "Macbook";
+
+        existingProductId = 2L;
+        nonexistingProductId = 100L;
+        dependentProductId = 3L;
 
         clientToken = tokenUtil.obtainAccessToken(mockMvc, clientUsername,clientPassword);
         adminToken = tokenUtil.obtainAccessToken(mockMvc, adminUsername,adminPassword);
@@ -250,5 +260,58 @@ result.andExpect(status().isForbidden());
 
         result.andExpect(status().isUnauthorized());
     }
+    @Test
+    public void deleteShouldReturnNoContentWhenIdExistsAndAdminLogged() throws Exception {
+
+        ResultActions result = mockMvc
+                .perform(delete("/products/{id}", existingProductId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .accept(MediaType.APPLICATION_JSON));
+
+        result.andExpect(status().isNoContent());
+    }
+
+    @Test
+    public void deleteShouldReturnNotFoundWhenIdDoesNotExistAndAdminLogged() throws Exception {
+
+        ResultActions result = mockMvc
+                .perform(delete("/products/{id}", nonexistingProductId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .accept(MediaType.APPLICATION_JSON));
+
+        result.andExpect(status().isNotFound());
+    }
+    @Test
+    @Transactional(propagation = Propagation.SUPPORTS)
+    public void deleteShouldReturnBadRequestWhenIdExistsAndAdminLogged () throws Exception {
+
+        ResultActions result = mockMvc
+                .perform(delete("/products/{id}", dependentProductId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .accept(MediaType.APPLICATION_JSON));
+
+        result.andExpect(status().isBadRequest());
+ }
+ @Test
+ public void deleteShouldReturnForbiddenWhenIdExistsAndClientLogged () throws Exception {
+
+
+     ResultActions result = mockMvc
+             .perform(delete("/products/{id}", existingProductId)
+                     .header("Authorization", "Bearer " + clientToken)
+                     .accept(MediaType.APPLICATION_JSON));
+
+     result.andExpect(status().isForbidden());
+ }
+ @Test
+    public void deleteShouldReturnUnauthorizedWhenIdExistsAndInvalidToken() throws Exception {
+     ResultActions result = mockMvc
+             .perform(delete("/products/{id}", existingProductId)
+                     .header("Authorization", "Bearer " + invalidToken)
+                     .accept(MediaType.APPLICATION_JSON));
+
+     result.andExpect(status().isUnauthorized());
+ }
 }
+
 
