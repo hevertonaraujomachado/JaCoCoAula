@@ -30,6 +30,8 @@ public class ProductDTO {
     @NotEmpty(message = "Deve ter pelo menos uma categoria")
     private List<CategoryDTO> categories = new ArrayList<>();
 
+    public ProductDTO() {
+    }
     public ProductDTO(Pageable pageable) {
     }
     
